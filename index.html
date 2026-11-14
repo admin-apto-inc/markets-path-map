@@ -87,7 +87,7 @@ dd { margin: 0; }
 .watch small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; }
 .gloss { display: grid; gap: 12px; }
 .gloss input { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); max-width: 420px; width: 100%; }
-.glist { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.glist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 12px; }
 .gitem { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 6px; align-content: start; background: var(--bg); }
 .gitem.hit { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .gitem h3 { font-size: .98rem; }
@@ -96,6 +96,52 @@ dd { margin: 0; }
 .start span { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 
 .status { color: var(--muted); font-size: 13px; }
+.flag { display: grid; gap: 4px; background: color-mix(in srgb, var(--conflict) 9%, transparent); border-left: 4px solid var(--conflict);
+  border-radius: 6px; padding: 10px 12px; color: var(--ink); font-weight: 400; margin: 0; }
+.flag b { color: var(--conflict); }
+.flag p { margin: 0; font-size: 13.5px; }
+.sheetclose { display: none; }
+.dhead { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+
+/* Phone and small-tablet map: the paths as tappable cards in their rows; details slide up from the bottom. */
+.phonemap { display: none; gap: 12px; }
+.pm-hint { margin: 0; }
+.pm-tier { background: var(--tier); border-radius: 10px; padding: 12px; display: grid; gap: 10px; }
+.pm-tier h2 { font: 600 12px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pm-node { font: inherit; text-align: left; color: var(--node-ink); background: var(--node); border: 1.5px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; min-height: 76px; display: grid; gap: 2px; align-content: start; cursor: pointer; }
+.pm-node .n { font: 600 15.5px/1.25 var(--display); }
+.pm-node .s { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.pm-node .h { font-size: 12.5px; font-weight: 600; color: var(--accent); }
+.pm-node .tag { font-size: 11.5px; font-weight: 600; color: var(--outside); }
+.pm-node.rule { border-style: dashed; border-color: var(--conflict); }
+.pm-node.rule .tag { color: var(--conflict); }
+.pm-node.outside { border-color: var(--outside); }
+.pm-node.picked { background: var(--picked); }
+.pm-node.sel { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.pm-node.dim { opacity: .35; }
+.pm-node:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.pm-badge { justify-self: start; margin-top: 4px; font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 1px 8px; color: var(--panel); }
+.pm-badge.builds { background: var(--builds); } .pm-badge.pairs { background: var(--pairs); }
+.pm-badge.overlap { background: var(--overlap); } .pm-badge.conflict { background: var(--conflict); }
+.hide-builds .pm-badge.builds, .hide-pairs .pm-badge.pairs, .hide-overlap .pm-badge.overlap, .hide-conflict .pm-badge.conflict { display: none; }
+#backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / .45); z-index: 15; }
+@media (max-width: 900px) {
+  body { font-size: 15.5px; }
+  h1 { font-size: 1.45rem; }
+  .mapbox { display: none; }
+  .phonemap { display: grid; }
+  .legend button { padding: 8px 12px; }
+  #detail:not(.open) { display: none; }
+  #detail.open, #termcard:not([hidden]) { position: fixed; left: 0; right: 0; bottom: 0; max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 16px 16px 0 0; z-index: 20; box-shadow: 0 -8px 30px rgb(0 0 0 / .25);
+    padding: 16px max(16px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  #termcard:not([hidden]) { z-index: 25; max-height: 70vh; }
+  .sheetclose { display: inline-block; flex: none; }
+  .pickbtn { min-height: 44px; }
+  body.sheet-open { overflow: hidden; }
+}
 @media (prefers-reduced-motion: no-preference) { .node, .edge { transition: opacity .15s; } }
 </style>
 
@@ -116,6 +162,9 @@ dd { margin: 0; }
 
   <div class="main">
     <div class="mapbox"><svg id="map" viewBox="0 0 1150 724" role="img" aria-label="Map of investment paths and their connections"></svg></div>
+    <div class="phonemap" id="phonemap">
+      <p class="note pm-hint">Tap a path to see what it is and how it connects. Its connections light up on the other paths, colored as in the key above.</p>
+    </div>
     <div class="side">
       <section class="card" id="detail" aria-live="polite"></section>
       <section class="card" id="termcard" aria-live="polite" hidden></section>
@@ -134,6 +183,7 @@ dd { margin: 0; }
       </section>
     </div>
   </div>
+  <div id="backdrop" hidden></div>
   <section class="card gloss" id="glossary">
     <h2>Glossary: the words, in plain English</h2>
     <label class="note" for="gsearch">Search a word</label>
@@ -183,7 +233,7 @@ const PATHS = {
     fits: "Very hands-on, high risk capacity, and time during market hours.", risk: 5, hands: 5, hours: 15 },
   options: { name: "Options and margin", sub: "Also short selling", tier: 3, x: 760, rule: true,
     what: "Borrowing to invest (margin), betting on a fall (short selling) or trading contracts on a stock's price (options). Losses can exceed what you put in. Margin isn't allowed in IRAs, and options there are limited.",
-    fits: "Experienced investors only. The current course rules exclude these, so choosing this path means changing a rule.", risk: 5, hands: 5, hours: 20 },
+    fits: "Experienced investors only. The current course rules exclude it (see the note above).", risk: 5, hands: 5, hours: 20 },
 };
 const EDGES = [
   ["dividend","whole","builds","Usually sits on top of a broad base rather than replacing it."],
@@ -276,9 +326,45 @@ for (const k in PATHS) {
   nodeEls[k] = g;
 }
 
+// Phone map: the same paths as cards, row by row.
+const phoneEls = {};
+const phonemap = document.getElementById("phonemap");
+TIERS.forEach((t, i) => {
+  const sec = document.createElement("section"); sec.className = "pm-tier";
+  const h = document.createElement("h2"); h.textContent = t.label; sec.appendChild(h);
+  const grid = document.createElement("div"); grid.className = "pm-grid"; sec.appendChild(grid);
+  Object.keys(PATHS).filter((k) => PATHS[k].tier === i + 1).sort((a, b) => PATHS[a].x - PATHS[b].x).forEach((k) => {
+    const P = PATHS[k];
+    const b = document.createElement("button"); b.type = "button";
+    b.className = "pm-node" + (P.rule ? " rule" : "") + (P.outside ? " outside" : "");
+    b.innerHTML = `<span class="n"></span><span class="s"></span><span class="h">About ${P.hours} hours</span>` +
+      (P.rule ? `<span class="tag">Outside course rules</span>` : P.outside ? `<span class="tag">Not stocks</span>` : "") + `<span class="pm-badge" hidden></span>`;
+    b.querySelector(".n").textContent = P.name; b.querySelector(".s").textContent = P.sub;
+    b.addEventListener("click", () => select(k));
+    grid.appendChild(b); phoneEls[k] = b;
+  });
+  phonemap.appendChild(sec);
+});
+const pmFoot = document.createElement("p"); pmFoot.className = "note";
+pmFoot.textContent = "Every path builds on the core modules. Hours are rough estimates for that path's modules, on top of about 39 hours of core and finish.";
+phonemap.appendChild(pmFoot);
+
+// Bottom sheets on phones: the path details and word cards slide up over the map.
+const phoneQ = window.matchMedia("(max-width: 900px)");
+const backdrop = document.getElementById("backdrop");
+function syncSheet() {
+  const open = phoneQ.matches && (detail.classList.contains("open") || !termcard.hidden);
+  backdrop.hidden = !open; document.body.classList.toggle("sheet-open", open);
+}
+function closeSheets() { detail.classList.remove("open"); termcard.hidden = true; syncSheet(); }
+backdrop.addEventListener("click", closeSheets);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheets(); });
+phoneQ.addEventListener ? phoneQ.addEventListener("change", syncSheet) : phoneQ.addListener(syncSheet);
+
 // legend toggles
 document.querySelectorAll(".legend button").forEach((b) => b.addEventListener("click", () => {
   const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on);
+  document.body.classList.toggle("hide-" + b.dataset.t, !on);
   edgeEls.forEach((e) => { if (e.classList.contains(b.dataset.t)) e.classList.toggle("hide", !on); });
 }));
 
@@ -292,7 +378,17 @@ function select(k) {
   const near = new Set([k, ...relsOf(k).map((r) => r.other)]);
   for (const n in nodeEls) { nodeEls[n].classList.toggle("sel", n === k); nodeEls[n].classList.toggle("dim", !near.has(n)); }
   edgeEls.forEach((e) => e.classList.toggle("dim", e.dataset.a !== k && e.dataset.b !== k));
+  const relBy = Object.fromEntries(relsOf(k).map((r) => [r.other, r]));
+  for (const n in phoneEls) {
+    const b = phoneEls[n], r = relBy[n], badge = b.querySelector(".pm-badge");
+    b.classList.toggle("sel", n === k); b.classList.toggle("dim", !near.has(n));
+    b.setAttribute("aria-pressed", n === k);
+    badge.hidden = !r; badge.className = "pm-badge" + (r ? " " + r.t : "");
+    badge.textContent = r ? (r.t === "builds" ? (r.dir === "out" ? "Needed first" : "Builds on it") : r.t === "conflict" ? "Conflicts" : TYPE_LABEL[r.t]) : "";
+  }
   renderDetail();
+  detail.classList.add("open"); syncSheet();
+  if (phoneQ.matches) detail.scrollTop = 0;
 }
 // Plain-English glossary. v = [YouTube id, title, channel, length]. Videos checked 11/14/2026.
 const GLOSSARY = [
@@ -412,8 +508,9 @@ function showTerm(id) {
   const e = GBY[id]; if (!e) return;
   termcard.hidden = false;
   termcard.innerHTML = `<h2>${e.term}</h2>${termBody(e)}<button type="button" class="pickbtn on" id="closeterm">Close</button>`;
-  document.getElementById("closeterm").addEventListener("click", () => { termcard.hidden = true; });
-  termcard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  document.getElementById("closeterm").addEventListener("click", () => { termcard.hidden = true; syncSheet(); });
+  syncSheet();
+  if (phoneQ.matches) termcard.scrollTop = 0; else termcard.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 document.addEventListener("click", (ev) => { const b = ev.target.closest(".term"); if (b) showTerm(b.dataset.g); });
 function renderGlossary(q = "") {
@@ -436,15 +533,18 @@ function renderDetail() {
   const items = rels.map((r) => `<li><span class="dot" style="background:${TYPE_COLOR[r.t]}"></span><span><b>${label(r)}: ${PATHS[r.other].name}.</b> ${linkify(r.why, used)}</span></li>`).join("") || `<li>Stands mostly on its own.</li>`;
   const picked = myPicks.has(current);
   detail.innerHTML = `
-    <h2>${P.name}</h2>
+    <div class="dhead"><h2>${P.name}</h2><button type="button" class="pickbtn on sheetclose" id="closedetail">Close</button></div>
     <div class="meta"><span class="chip">Risk ${scale(P.risk)}</span><span class="chip">Hands-on ${scale(P.hands)}</span><span class="chip">About ${P.hours} hours</span></div>
-    ${P.rule ? `<p class="flag">Outside the current course rules. Picking it means changing that rule first.</p>` : ""}
+    ${P.rule ? `<div class="flag"><b>Outside the current course rules</b>
+      <p>One of the course rules is: no borrowing to invest (margin), no options and no leveraged funds while the course runs. These can lose more than you put in, and the course doesn't teach them.</p>
+      <p>What that means for you: you can add this path to your picks to show you're interested, but it won't be studied or traded during the course unless LeeAnn and Everly first agree to drop or change that rule. If they do, this path's modules get built like any other.</p></div>` : ""}
     ${GBY[PATH_START[current]] && GBY[PATH_START[current]].v ? `<div class="start"><span>Start here</span>${watchLink(GBY[PATH_START[current]].v)}</div>` : ""}
     <dl><div><dt>What it is</dt><dd>${what}</dd></div><div><dt>Fits</dt><dd>${fits}</dd></div></dl>
     <div><dt style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Connections</dt><ul class="rel">${items}</ul></div>
     <button type="button" class="pickbtn${picked ? " on" : ""}" id="pickbtn">${picked ? "Remove from my picks" : "Add to my picks"}</button>
     <p class="note" id="picknote"></p>`;
   document.getElementById("pickbtn").addEventListener("click", togglePick);
+  document.getElementById("closedetail").addEventListener("click", () => { detail.classList.remove("open"); syncSheet(); });
 }
 function checks(keys) {
   const s = new Set(keys), out = [];
@@ -455,7 +555,7 @@ function checks(keys) {
   keys.forEach((k) => {
     const needs = EDGES.filter(([a, , t]) => a === k && t === "builds").map(([, b]) => b);
     if (needs.length && !needs.some((n) => s.has(n))) out.push(["b", `${PATHS[k].name} needs ${needs.map((n) => PATHS[n].name).join(" or ")} first.`]);
-    if (PATHS[k].rule) out.push(["c", `${PATHS[k].name} is outside the current course rules.`]);
+    if (PATHS[k].rule) out.push(["c", `${PATHS[k].name} is outside the current course rules (no margin, options or leveraged funds during the course). It stays on the wish list unless LeeAnn and Everly agree to change that rule.`]);
   });
   return out;
 }
@@ -478,7 +578,7 @@ function renderPeople() {
     box.appendChild(d);
   });
 }
-function paintPicked() { for (const n in nodeEls) nodeEls[n].classList.toggle("picked", myPicks.has(n)); }
+function paintPicked() { for (const n in nodeEls) { nodeEls[n].classList.toggle("picked", myPicks.has(n)); phoneEls[n].classList.toggle("picked", myPicks.has(n)); } }
 function togglePick() {
   if (!current) return;
   myPicks.has(current) ? myPicks.delete(current) : myPicks.add(current);
