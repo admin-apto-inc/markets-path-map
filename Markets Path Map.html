@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Markets Path Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: header, then the map (left) beside the path detail and picks (right); stacks on phones. */
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #172033; --muted: #5a6478; --line: #d9dee7;
+  --accent: #1f5fbf; --node: #ffffff; --node-ink: #172033; --tier: #eef1f6;
+  --pairs: #1d8a5b; --builds: #1f5fbf; --overlap: #b7791f; --conflict: #c53b3b; --outside: #7b5ea7;
+  --chip: #eef1f6; --picked: #e6f0fd;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141d; --panel: #161d29; --ink: #e6ebf3; --muted: #9aa5b8; --line: #2a3445;
+  --accent: #6aa3ff; --node: #1b2433; --node-ink: #e6ebf3; --tier: #141b26;
+  --pairs: #4cc38a; --builds: #6aa3ff; --overlap: #e0a84a; --conflict: #f07171; --outside: #b39ae0;
+  --chip: #212b3b; --picked: #1c2c45; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f141d; --panel: #161d29; --ink: #e6ebf3; --muted: #9aa5b8; --line: #2a3445;
+  --accent: #6aa3ff; --node: #1b2433; --node-ink: #e6ebf3; --tier: #141b26;
+  --pairs: #4cc38a; --builds: #6aa3ff; --overlap: #e0a84a; --conflict: #f07171; --outside: #b39ae0;
+  --chip: #212b3b; --picked: #1c2c45; color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: 1.7rem; }
+h2 { font-size: 1.15rem; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 18px; }
+.lede { color: var(--muted); max-width: 70ch; margin: 6px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; }
+.legend button { font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.legend button[aria-pressed="false"] { opacity: .45; }
+.legend i { width: 22px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+@media (max-width: 980px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.mapbox { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+svg { display: block; width: 100%; min-width: 800px; height: auto; }
+.tier-label { font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+.tier { fill: var(--tier); }
+.node rect { fill: var(--node); stroke: var(--line); stroke-width: 1.5; }
+.node text { fill: var(--node-ink); font: 600 14px var(--display); pointer-events: none; }
+.node .sub { font: 400 11.5px var(--body); fill: var(--muted); }
+.node { cursor: pointer; }
+.node:focus { outline: none; }
+.node:focus rect, .node.sel rect { stroke: var(--accent); stroke-width: 3; }
+.node.picked rect { fill: var(--picked); }
+.node.rule rect { stroke-dasharray: 5 4; }
+.node.dim { opacity: .28; }
+.edge { fill: none; stroke-width: 2.4; }
+.edge.pairs { stroke: var(--pairs); }
+.edge.builds { stroke: var(--builds); }
+.edge.overlap { stroke: var(--overlap); stroke-dasharray: 2 5; stroke-linecap: round; }
+.edge.conflict { stroke: var(--conflict); stroke-dasharray: 9 6; }
+.edge.dim { opacity: .1; }
+.edge.hide { display: none; }
+.side { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--chip); border-radius: 6px; padding: 3px 8px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.flag { color: var(--conflict); font-weight: 600; font-size: 13.5px; }
+dl { margin: 0; display: grid; gap: 8px; }
+dt { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+dd { margin: 0; }
+.rel { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rel li { display: flex; gap: 8px; align-items: baseline; }
+.rel b { font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; transform: translateY(1px); }
+.pickbtn { font: 600 14px var(--body); padding: 9px 12px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--panel); cursor: pointer; }
+.pickbtn.on { background: transparent; color: var(--accent); }
+.pickbtn:focus-visible, .legend button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.people { display: grid; gap: 12px; }
+.person h3 { font-size: 1rem; }
+.person ul { margin: 4px 0 0; padding-left: 18px; }
+.warn { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.warn li { font-size: 13.5px; }
+.warn .c { color: var(--conflict); } .warn .o { color: var(--overlap); } .warn .b { color: var(--builds); }
+.note { color: var(--muted); font-size: 13px; margin: 0; }
+.term { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.term:hover, .term:focus-visible { text-decoration-style: solid; outline: none; }
+[hidden] { display: none !important; }
+.watch { display: block; color: var(--accent); font-weight: 600; text-decoration: none; }
+.watch:hover { text-decoration: underline; }
+.watch small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.gloss { display: grid; gap: 12px; }
+.gloss input { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); max-width: 420px; width: 100%; }
+.glist { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.gitem { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 6px; align-content: start; background: var(--bg); }
+.gitem.hit { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.gitem h3 { font-size: .98rem; }
+.gitem p { margin: 0; font-size: 14px; }
+.start { background: var(--chip); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; }
+.start span { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+.status { color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) { .node, .edge { transition: opacity .15s; } }
+</style>
+
+</head><body>
+<div class="wrap">
+  <header>
+    <h1>Markets Path Map</h1>
+    <p class="lede">Every path you could take, and how they connect. Everyone starts with the core modules (accounts, orders, fees, risk, investor behavior), so the core isn't drawn. Click a path to see what it is, what it needs first, and what it pairs with, overlaps or conflicts with. Then mark the ones you want to pursue. This is study material, not advice on what to buy.</p>
+    <p class="lede">New to the words? Every <button type="button" class="term" data-g="__glossary">underlined word</button> opens a plain-English explanation and a short video. The full <a href="#glossary" style="color:var(--accent)">glossary</a> is at the bottom.</p>
+  </header>
+
+  <div class="legend" role="group" aria-label="Show or hide connection types">
+    <button type="button" data-t="builds" aria-pressed="true" style="color:var(--builds)"><i></i><span style="color:var(--ink)">Needs first</span></button>
+    <button type="button" data-t="pairs" aria-pressed="true" style="color:var(--pairs)"><i></i><span style="color:var(--ink)">Pairs well</span></button>
+    <button type="button" data-t="overlap" aria-pressed="true" style="color:var(--overlap)"><i style="border-top-style:dotted"></i><span style="color:var(--ink)">Overlaps (some double-up)</span></button>
+    <button type="button" data-t="conflict" aria-pressed="true" style="color:var(--conflict)"><i style="border-top-style:dashed"></i><span style="color:var(--ink)">Replaces or conflicts</span></button>
+  </div>
+
+  <div class="main">
+    <div class="mapbox"><svg id="map" viewBox="0 0 1060 640" role="img" aria-label="Map of investment paths and their connections"></svg></div>
+    <div class="side">
+      <section class="card" id="detail" aria-live="polite"></section>
+      <section class="card" id="termcard" aria-live="polite" hidden></section>
+      <section class="card">
+        <h2>Picks</h2>
+        <label class="note" for="myname">Your name</label>
+        <input id="myname" type="text" autocomplete="name" placeholder="LeeAnn or Everly" style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)">
+        <div class="people" id="people"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" class="pickbtn" id="savefile">Save my picks file</button>
+          <label class="pickbtn on" for="loadfile" style="display:inline-block">Compare a picks file</label>
+          <input id="loadfile" type="file" accept=".json,.txt,application/json" multiple hidden>
+        </div>
+        <p class="note">Picks stay in your browser as you go. Save your picks file and put it in the Stocks and Investing folder in WorkDrive, so the other person (and Claude) can open it. To compare, download their picks file and open it here.</p>
+        <p class="status" id="status"></p>
+      </section>
+    </div>
+  </div>
+  <section class="card gloss" id="glossary">
+    <h2>Glossary: the words, in plain English</h2>
+    <label class="note" for="gsearch">Search a word</label>
+    <input id="gsearch" type="search" placeholder="For example: ETF, dividend, margin">
+    <div class="glist" id="glist"></div>
+    <p class="note">Videos are free on YouTube and open in a new tab. They were chosen for clear, beginner-level explanations from established channels (Schwab, Fidelity, Khan Academy, PBS's Two Cents and others) and checked 11/14/2026. They explain ideas; none of them is advice for your situation.</p>
+  </section>
+</div>
+
+<script>
+const PATHS = {
+  allinone: { name: "All-in-one or robo", sub: "One fund or service", tier: 1, x: 40,
+    what: "A single target-date or balanced fund, or a robo-adviser, that holds U.S. stocks, international stocks and bonds in a set mix and rebalances for you.",
+    fits: "Someone who wants the least hands-on approach possible.", risk: 2, hands: 1, hours: 6 },
+  whole: { name: "Whole market", sub: "Broad index funds", tier: 1, x: 240,
+    what: "Index funds that own nearly every U.S. company, bought and held. Often built as a three-fund setup with international and bonds.",
+    fits: "Hands-off investors who still want to choose their own mix.", risk: 3, hands: 2, hours: 10 },
+  intl: { name: "International", sub: "Outside the U.S.", tier: 1, x: 440,
+    what: "Developed and emerging markets through international funds, ADRs, or shares bought on foreign exchanges. Adds currency and country risk, and foreign tax on dividends.",
+    fits: "Someone who wants more than the U.S. market, or more than a broad fund's default international share.", risk: 3, hands: 3, hours: 15 },
+  bonds: { name: "Bonds and income", sub: "Treasuries, funds", tier: 1, x: 640,
+    what: "Lending instead of owning: Treasuries, TIPS, I bonds and bond funds. Lower swings, lower long-run growth, and interest-rate risk.",
+    fits: "Lower risk capacity, money needed within a few years, or anyone steadying a stock-heavy mix.", risk: 1, hands: 2, hours: 10 },
+  crypto: { name: "Crypto", sub: "Not a stock", tier: 1, x: 860, outside: true,
+    what: "Bitcoin and other digital assets, held directly on an exchange or through crypto ETFs in a brokerage account. Very volatile, and a frequent target of fraud.",
+    fits: "Someone with high risk capacity who treats it as a small, separate slice.", risk: 5, hands: 3, hours: 10 },
+  dividend: { name: "Dividend investing", sub: "Steady payouts", tier: 2, x: 40,
+    what: "Companies or funds chosen for steady, growing dividends. Dividends in a taxable account are taxed each year, even if reinvested.",
+    fits: "Someone who wants income from the portfolio, or prefers mature companies.", risk: 3, hands: 3, hours: 8 },
+  factor: { name: "Factor tilts", sub: "Value, small firms", tier: 2, x: 240,
+    what: "Leaning a whole-market portfolio toward company traits that research links to higher long-run returns, such as cheap (value) or small companies. Can trail the market for years.",
+    fits: "A whole-market investor who has read the research and can stick with a tilt through long dry spells.", risk: 3, hands: 2, hours: 8 },
+  sector: { name: "Sector or theme", sub: "One industry or trend", tier: 2, x: 440,
+    what: "Funds for one industry (healthcare, energy, tech) or a trend. Concentrated, so swings are bigger, and popular themes are often bought after the run-up.",
+    fits: "Someone with a strong view on one area, kept to a small slice.", risk: 4, hands: 3, hours: 6 },
+  esg: { name: "Values-based (ESG)", sub: "Screened holdings", tier: 2, x: 640,
+    what: "Funds that screen companies on environmental, social or governance criteria. Screens differ widely between funds, and fees are often higher.",
+    fits: "Someone for whom what the money owns matters as much as the return.", risk: 3, hands: 2, hours: 6 },
+  reits: { name: "Real estate (REITs)", sub: "Property as stock", tier: 2, x: 840,
+    what: "Companies that own property and pay out most of their income. Their dividends are mostly taxed as ordinary income.",
+    fits: "Someone who wants property exposure without buying property.", risk: 3, hands: 2, hours: 6 },
+  company: { name: "Company picking", sub: "Individual stocks", tier: 3, x: 190,
+    what: "Researching and choosing individual companies: annual reports, valuation, position size, when to sell.",
+    fits: "Hands-on investors with time for research and a higher risk level.", risk: 4, hands: 5, hours: 18 },
+  active: { name: "Active trading", sub: "Swing or day trading", tier: 3, x: 450,
+    what: "Frequent buying and selling to profit from short-term moves. Gains held a year or less are taxed as ordinary income, and wash-sale rules apply to losses.",
+    fits: "Very hands-on, high risk capacity, and time during market hours.", risk: 5, hands: 5, hours: 15 },
+  options: { name: "Options and margin", sub: "Also short selling", tier: 3, x: 710, rule: true,
+    what: "Borrowing to invest (margin), betting on a fall (short selling) or trading contracts on a stock's price (options). Losses can exceed what you put in. Margin isn't allowed in IRAs, and options there are limited.",
+    fits: "Experienced investors only. The current course rules exclude these, so choosing this path means changing a rule.", risk: 5, hands: 5, hours: 20 },
+};
+const EDGES = [
+  ["dividend","whole","builds","Usually sits on top of a broad base rather than replacing it."],
+  ["factor","whole","builds","A tilt only makes sense on top of a whole-market portfolio."],
+  ["sector","whole","builds","Meant as a small slice beside a broad base."],
+  ["reits","whole","builds","Added beside a broad base."],
+  ["active","company","builds","Trading individual stocks takes the company-picking skills first."],
+  ["options","company","builds","Needs company-picking skills first."],
+  ["options","active","builds","Builds on trading experience."],
+  ["whole","intl","pairs","The classic pairing: U.S. plus international (or one total-world fund)."],
+  ["whole","bonds","pairs","Bonds set how much the portfolio swings."],
+  ["intl","bonds","pairs","Together with stocks, the three-fund setup."],
+  ["dividend","bonds","pairs","Both serve an income goal."],
+  ["whole","company","pairs","Core and satellite: a broad base, plus a small picked slice."],
+  ["esg","allinone","pairs","ESG target-date funds and robo portfolios exist."],
+  ["esg","whole","pairs","ESG index funds can serve as the broad base."],
+  ["whole","reits","overlap","Total-market funds already hold REITs."],
+  ["whole","sector","overlap","A whole-market fund already holds every sector."],
+  ["dividend","factor","overlap","Dividend stocks lean toward value."],
+  ["company","dividend","overlap","Picking dividend stocks is company picking."],
+  ["allinone","whole","conflict","An all-in-one fund already holds the whole market; adding more throws its mix off."],
+  ["allinone","intl","conflict","Already includes international."],
+  ["allinone","bonds","conflict","Already includes bonds."],
+  ["active","whole","conflict","Opposite philosophies; frequent trading also turns gains into short-term, higher-taxed income. Keep them in separate accounts if both."],
+  ["esg","sector","conflict","Some sectors (energy, for one) are screened out by many ESG funds."],
+];
+const TIERS = [
+  { y: 32, h: 150, label: "Building blocks: what the portfolio is made of" },
+  { y: 212, h: 150, label: "Tilts: added on top of a building block" },
+  { y: 392, h: 150, label: "Hands-on: you choose, time and size each holding" },
+];
+const W = 176, H = 64;
+const nodeY = (t) => TIERS[t - 1].y + 62;
+const C = (k) => ({ x: PATHS[k].x + W / 2, y: nodeY(PATHS[k].tier) + H / 2 });
+const svg = document.getElementById("map");
+const NS = "http://www.w3.org/2000/svg";
+const el = (n, a = {}, p = svg) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+const TYPE_LABEL = { builds: "Needs first", pairs: "Pairs well", overlap: "Overlaps", conflict: "Replaces or conflicts" };
+const TYPE_COLOR = { builds: "var(--builds)", pairs: "var(--pairs)", overlap: "var(--overlap)", conflict: "var(--conflict)" };
+const scale = (n) => "●".repeat(n) + "○".repeat(5 - n);
+
+// tiers
+TIERS.forEach((t) => { el("rect", { class: "tier", x: 12, y: t.y, width: 1036, height: t.h, rx: 10 }); const tx = el("text", { class: "tier-label", x: 28, y: t.y + 24 }); tx.textContent = t.label; });
+el("line", { x1: 840, y1: 70, x2: 840, y2: 176, stroke: "var(--outside)", "stroke-dasharray": "4 4", "stroke-width": 1.5 });
+const out = el("text", { class: "tier-label", x: 860, y: 86 }); out.textContent = "Not stocks";
+const foot = el("text", { class: "tier-label", x: 28, y: 580 }); foot.textContent = "Every path builds on the core modules. Dashed outline: outside the current course rules.";
+const foot2 = el("text", { class: "tier-label", x: 28, y: 602 }); foot2.textContent = "Hours are rough estimates for that path's modules, on top of about 39 hours of core and finish.";
+
+// edges
+const edgeEls = EDGES.map(([a, b, t]) => {
+  const p = C(a), q = C(b);
+  const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2 - (p.y === q.y ? 46 : 0);
+  return el("path", { class: "edge " + t, d: `M${p.x},${p.y} Q${mx},${my} ${q.x},${q.y}`, "data-a": a, "data-b": b });
+});
+// nodes
+const nodeEls = {};
+for (const k in PATHS) {
+  const P = PATHS[k], y = nodeY(P.tier);
+  const g = el("g", { class: "node" + (P.rule ? " rule" : ""), tabindex: 0, role: "button", "aria-label": P.name, "data-k": k });
+  el("title", {}, g).textContent = P.name + ": " + P.what;
+  el("rect", { x: P.x, y, width: W, height: H, rx: 8 }, g);
+  if (P.outside) g.querySelector("rect").style.stroke = "var(--outside)";
+  const t1 = el("text", { x: P.x + 12, y: y + 26 }, g); t1.textContent = P.name;
+  const t2 = el("text", { class: "sub", x: P.x + 12, y: y + 46 }, g); t2.textContent = `${P.sub} · ~${P.hours} h`;
+  g.addEventListener("click", () => select(k));
+  g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(k); } });
+  nodeEls[k] = g;
+}
+
+// legend toggles
+document.querySelectorAll(".legend button").forEach((b) => b.addEventListener("click", () => {
+  const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on);
+  edgeEls.forEach((e) => { if (e.classList.contains(b.dataset.t)) e.classList.toggle("hide", !on); });
+}));
+
+let current = null;
+let myPicks = new Set();
+let canSave = false;
+const detail = document.getElementById("detail");
+function relsOf(k) { return EDGES.filter(([a, b]) => a === k || b === k).map(([a, b, t, why]) => ({ other: a === k ? b : a, t, why, dir: a === k ? "out" : "in" })); }
+function select(k) {
+  current = k;
+  const near = new Set([k, ...relsOf(k).map((r) => r.other)]);
+  for (const n in nodeEls) { nodeEls[n].classList.toggle("sel", n === k); nodeEls[n].classList.toggle("dim", !near.has(n)); }
+  edgeEls.forEach((e) => e.classList.toggle("dim", e.dataset.a !== k && e.dataset.b !== k));
+  renderDetail();
+}
+// Plain-English glossary. v = [YouTube id, title, channel, length]. Videos checked 11/14/2026.
+const GLOSSARY = [
+  { id: "stock", term: "Stock (share)", match: ["individual stocks", "individual companies", "stocks", "stock"], v: ["p7HKvqRI_Bo", "How does the stock market work?", "TED-Ed", "4:30"],
+    def: "A small slice of ownership in a company. If the company grows and earns more, your slice is usually worth more; if it struggles, it's worth less." },
+  { id: "brokerage", term: "Brokerage account", match: ["brokerage account", "brokerage"], v: ["PwLy3av-Dq4", "Brokerage Account: What It Is And Why You Need to Open One", "Wealth Twins", "12:32"],
+    def: "The account you buy and sell investments in, like a bank account for stocks and funds. Fidelity, Schwab and Vanguard are examples of companies that run them." },
+  { id: "ira", term: "IRA (Roth and traditional)", match: ["retirement accounts", "IRAs", "IRA"], v: ["sOVx4zRGTz4", "Roth IRA vs Traditional IRA", "NerdWallet", "9:39"],
+    def: "A retirement account with tax breaks. Traditional: you may get a tax break now and pay tax when you take money out. Roth: you pay tax now and take money out tax-free in retirement. Both have yearly limits and rules on early withdrawals." },
+  { id: "index", term: "Index fund", match: ["index funds", "index fund"], v: ["u5eewhr7KKY", "What The Heck Is An Index Fund?", "Two Cents", "7:08"],
+    def: "A fund that simply buys everything in a list of companies (an index, like the S&P 500) instead of a manager picking. Low cost, and you get the market's return." },
+  { id: "etf", term: "ETF (exchange-traded fund)", match: ["ETFs", "ETF"], cs: true, v: ["Tv4pkivGvdU", "Investing Basics: ETFs", "Charles Schwab", "4:09"],
+    def: "A fund that trades on the stock market like a single stock. One purchase can give you hundreds of companies, or bonds, or other assets." },
+  { id: "mutual", term: "Mutual fund", match: ["mutual funds", "mutual fund"], v: ["jxZa90pSYzc", "What the Heck Is a Mutual Fund?", "Two Cents", "4:57"],
+    def: "A pool of many people's money that buys a basket of investments. Priced once a day, unlike an ETF, which trades all day." },
+  { id: "targetdate", term: "Target-date or balanced fund", match: ["target-date", "balanced fund"], v: ["dMtzyvxQuJ0", "Target Date Funds | Should You Invest In Them?", "Tae Kim - Financial Tortoise", "8:45"],
+    def: "One fund that holds U.S. stocks, international stocks and bonds in a set mix. A target-date fund shifts toward bonds as its year (say 2050) gets closer." },
+  { id: "robo", term: "Robo-adviser", match: ["robo-adviser", "robo"], v: ["D6go3NOON1c", "Should I Use a Robo-Advisor?", "Two Cents", "7:05"],
+    def: "An online service that asks you questions, picks a mix of funds for you and keeps it balanced automatically, for a small yearly fee." },
+  { id: "mix", term: "Mix (asset allocation)", match: ["asset allocation", "set mix", "mix"], v: ["R_FOYG3KHdo", "What Is Asset Allocation?", "Fidelity Investments", "4:37"],
+    def: "How your money is split between stocks, bonds and other things, for example 70% stocks and 30% bonds. It matters more than any single pick." },
+  { id: "diversify", term: "Diversification", match: ["diversification", "spreading"], v: ["MZchH0Ddzn8", "What Is Diversification?", "Fidelity Investments", "6:18"],
+    def: "Not putting all your eggs in one basket. Owning many different investments so one bad one can't sink you." },
+  { id: "rebalance", term: "Rebalancing", match: ["rebalances", "rebalancing", "rebalance"], v: ["IJxgI6P0beU", "Portfolio Rebalancing Explained", "Optimized Portfolio", "6:13"],
+    def: "Moving money back to your planned mix after the market pushes it off, for example selling some stocks after a big run-up to buy bonds." },
+  { id: "volatility", term: "Volatility (swings)", match: ["volatile", "swings"], v: ["tzBQJei0Ee4", "What Is Market Volatility?", "Fidelity Investments", "1:00"],
+    def: "How much and how fast prices go up and down. More volatile means bigger drops and jumps along the way." },
+  { id: "risk", term: "Risk level (tolerance and capacity)", match: ["risk capacity", "risk level", "risk tolerance"], v: ["L91FRxNkglk", "Understanding Risk Tolerance", "Fidelity Investments", "1:03"],
+    def: "Tolerance is how a drop would feel to you. Capacity is how big a drop your finances can actually absorb. The course uses whichever is lower." },
+  { id: "intl", term: "International investing", match: ["international funds", "foreign exchanges", "outside the U.S."], v: ["x4PoyV9iFeA", "2 Ways To Invest In Foreign Stocks", "Fidelity Investments", "2:26"], more: ["RQoVNzXZzx8", "Investing Internationally: ADRs, VIEs, and Everything Else", "The Plain Bagel", "17:55"],
+    def: "Owning companies based outside the U.S., through a fund, through ADRs, or by buying shares directly on a foreign stock exchange." },
+  { id: "emerging", term: "Developed and emerging markets", match: ["developed and emerging markets", "emerging markets", "country risk"], v: ["ZggFfsx2QNQ", "Emerging Markets Investing for Beginners", "Zions TV", "2:48"],
+    def: "Developed markets are wealthy countries with established stock markets (Japan, Germany, the U.K.). Emerging markets are growing economies (India, Brazil) with more potential and more country risk: politics, rules and currencies can change fast." },
+  { id: "adr", term: "ADR (American Depositary Receipt)", match: ["ADRs", "ADR"], cs: true, v: ["OWiQ8LOBIg8", "American Depositary Receipts (ADRs) Explained", "OTC Markets Group", "6:37"],
+    def: "A way to buy a foreign company's shares on a U.S. exchange, in dollars. A U.S. bank holds the real shares and issues receipts for them." },
+  { id: "currency", term: "Currency risk", match: ["currency risk", "currency"], v: ["K3flJjh00gA", "Should You Currency Hedge Your Portfolio?", "Ben Felix", "5:37"],
+    def: "When you own something priced in another currency, your return in dollars also depends on the exchange rate. A foreign stock can rise while the currency falls and leave you even." },
+  { id: "foreigntax", term: "Foreign tax on dividends", match: ["foreign tax on dividends", "foreign tax"], read: ["https://www.irs.gov/publications/p514", "IRS Publication 514"],
+    def: "Other countries often keep part of the dividends their companies pay you. In a taxable U.S. account you can usually get credit for it on your U.S. return." },
+  { id: "dividend", term: "Dividend", match: ["dividends", "dividend", "payouts"], v: ["7vSMV4A2_PI", "Dividend Basics", "Charles Schwab", "4:01"],
+    def: "Cash a company pays its owners out of its profits, usually every quarter. In a regular (taxable) account dividends are taxed in the year you get them, even if you reinvest them." },
+  { id: "bond", term: "Bond", match: ["bond funds", "bonds", "bond", "lending"], v: ["vAdn7aLHpO0", "Investing Basics: Bonds", "Charles Schwab", "4:47"],
+    def: "A loan you make to a government or company. They pay you interest and return your money on a set date. Usually steadier than stocks, with lower long-run growth." },
+  { id: "treasury", term: "Treasuries", match: ["Treasuries", "Treasury"], cs: true, v: ["sx6ttA-kmos", "The difference between bonds, notes and bills", "Marketplace", "6:06"],
+    def: "Loans to the U.S. government: bills (a year or less), notes (2 to 10 years) and bonds (20 to 30 years). Considered the safest bonds there are." },
+  { id: "tips", term: "TIPS", match: ["TIPS"], cs: true, v: ["piozJuwsyOQ", "TIPS for inflation-protected portfolios", "Vanguard", "5:05"],
+    def: "Treasury bonds whose value rises with inflation, so rising prices don't eat away what you lent." },
+  { id: "ibonds", term: "I bonds", match: ["I bonds"], cs: true, v: ["xPG5AFYUA7Y", "I Bonds Explained", "Jay Fairbrother", "10:18"],
+    def: "U.S. savings bonds bought directly from the Treasury, with a rate tied to inflation. Limited yearly purchase amount, and you must hold them at least a year." },
+  { id: "rates", term: "Interest-rate risk", match: ["interest-rate risk"], v: ["I7FDx4DPapw", "Relationship between bond prices and interest rates", "Khan Academy", "13:16"],
+    def: "When interest rates rise, existing bonds paying less are worth less, so bond prices fall. The longer the bond, the bigger the effect." },
+  { id: "fees", term: "Fees (expense ratio)", match: ["expense ratio", "fees"], v: ["q8OZKyriJio", "What is an Expense Ratio?", "SoFi", "1:42"],
+    def: "The yearly cost of owning a fund, as a percentage. 0.03% costs $3 a year per $10,000; 1% costs $100. Over decades the difference is large." },
+  { id: "factor", term: "Factor tilt", match: ["factor", "tilts", "tilt"], v: ["ViTnIebSzj4", "Should You Be Factor Investing?", "Ben Felix", "8:10"],
+    def: "Holding a bit more of the kinds of companies research has linked to higher long-run returns, such as cheap ones (value) or small ones, on top of the whole market." },
+  { id: "value", term: "Value vs. growth", match: ["value", "cheap"], v: ["6sUvcWpPvFE", "Growth Vs Value Investing", "The Plain Bagel", "13:16"],
+    def: "Value companies look cheap compared with their profits; growth companies are expected to grow fast and cost more for each dollar they earn." },
+  { id: "smallcap", term: "Small companies (small-cap)", match: ["small companies"], v: ["eEeUC3FL6lk", "What Are Small-Cap Stocks?", "The College Investor", "5:51"],
+    def: "Companies with a smaller total stock-market value. Historically more growth potential and bigger swings than large companies." },
+  { id: "sector", term: "Sector", match: ["sectors", "sector", "industry"], v: ["C0BK_Mip9oM", "Sector Rotation: How the Economic Cycle Affects Stocks", "Charles Schwab", "5:37"],
+    def: "A group of companies in the same line of business, like healthcare, energy or technology. The market is usually split into 11 sectors." },
+  { id: "esg", term: "ESG (values-based)", match: ["environmental, social or governance", "ESG", "screens", "screen"], v: ["2DgiAIbTuRE", "What Are ESG Funds and Why Are They Under Scrutiny?", "The Wall Street Journal", "5:29"],
+    def: "Environmental, social and governance. ESG funds leave out or favor companies based on things like pollution, labor practices or how the company is run. Each fund's rules differ." },
+  { id: "reit", term: "REIT (real estate investment trust)", match: ["REITs", "REIT", "property"], v: ["VG15Bk17mlI", "What's A REIT?", "Fidelity Investments", "2:07"],
+    def: "A company that owns property (apartments, warehouses, offices) and must pay out most of its income. You buy it like a stock." },
+  { id: "capgains", term: "Capital gains (short and long term)", match: ["ordinary income", "short-term"], v: ["TLFG1_jFQ_Y", "Capital Gains Taxes Explained: Short-Term vs. Long-Term", "Charles Schwab", "5:37"],
+    def: "Profit when you sell for more than you paid. Held a year or less: taxed like your paycheck (ordinary income). Held over a year: usually a lower rate." },
+  { id: "washsale", term: "Wash-sale rule", match: ["wash-sale rules", "wash-sale", "wash sale"], v: ["uQZl-QzLnFA", "Understanding the Wash Sale Rule", "Charles Schwab", "4:15"],
+    def: "If you sell at a loss and buy the same (or nearly the same) investment within 30 days before or after, you can't count that loss on your taxes yet." },
+  { id: "trading", term: "Day and swing trading", match: ["swing or day trading", "frequent buying and selling", "frequent trading"], v: ["H6rpR7Q_KvA", "Day Trading vs Swing Trading", "Financial Wisdom", "11:40"],
+    def: "Day trading: buying and selling within the same day. Swing trading: holding for days or weeks. Both try to profit from short moves, and most people who try lose money." },
+  { id: "options", term: "Options", match: ["options"], v: ["gWp3op51ZzI", "Investing Basics: Options", "Charles Schwab", "6:13"],
+    def: "Contracts that give the right to buy or sell a stock at a set price by a set date. Used to bet on moves or to protect holdings; some strategies can lose more than you put in." },
+  { id: "margin", term: "Margin (borrowing to invest)", match: ["borrowing to invest", "borrowing", "margin", "leverage"], v: ["0SGGSqOZhps", "Margin Buying Basics", "Wall Street Survivor", "2:11"],
+    def: "Borrowing from your broker to buy more than your cash allows. It magnifies gains and losses, and if prices fall the broker can sell your holdings without asking." },
+  { id: "short", term: "Short selling", match: ["short selling", "shorting", "betting on a fall"], v: ["CAs_aX95tVQ", "How Short Selling Works", "The Plain Bagel", "9:41"],
+    def: "Borrowing shares and selling them, hoping to buy them back cheaper later. If the price rises instead, the loss has no ceiling." },
+  { id: "crypto", term: "Crypto (Bitcoin and others)", match: ["digital assets", "bitcoin", "crypto"], v: ["s4g1XFU8Gto", "Bitcoin explained and made simple", "The Guardian", "3:25"],
+    def: "Digital money that runs on a public ledger (blockchain) rather than a bank. Prices swing wildly, and it's a common target for scams." },
+  { id: "cryptoetf", term: "Crypto ETF", match: ["crypto ETFs", "crypto ETF"], v: ["AGFsVQ3Aaz0", "Simply Explained: What is a Bitcoin ETF", "CoinMarketCap", "1:41"],
+    def: "An ETF that holds bitcoin (or another coin) for you, so you can own it in a regular brokerage account without a crypto exchange or wallet." },
+  { id: "threefund", term: "Three-fund portfolio", match: ["three-fund setup", "three-fund"], v: ["3jiouiwDurQ", "Who Is the 3-Fund Portfolio Right For?", "Morningstar", "5:26"],
+    def: "A whole portfolio made of three index funds: U.S. stocks, international stocks and U.S. bonds. Simple, cheap and widely diversified." },
+  { id: "coresat", term: "Core and satellite", match: ["core and satellite"], v: ["nPKgG3GbyRE", "How We Use Core & Satellite", "Equity Mates", "18:11"],
+    def: "Most of the money in a broad, low-cost base (the core), with a small part (satellites) for picks or themes you want to try." },
+  { id: "valuation", term: "Valuation (P/E ratio)", match: ["valuation"], v: ["J33ObDTsiOU", "P/E Ratio Basics", "Charles Schwab", "4:15"], more: ["kXYvRR7gV2E", "How I Research Stocks: Step-by-Step", "The Plain Bagel", "19:18"],
+    def: "Working out what a company is worth compared with its price. The price-to-earnings (P/E) ratio is the simplest version: the share price divided by profit per share." },
+  { id: "annual", term: "Annual report (10-K)", match: ["annual reports", "annual report", "10-K"], v: ["t-paZtZRGiI", "How To Read A 10-K", "Rule #1 Investing", "7:44"],
+    def: "The yearly report every U.S. public company files with the SEC: what it does, its risks and its finances. Free on the SEC's EDGAR site." },
+  { id: "position", term: "Position size", match: ["position size"],
+    def: "How much of your money goes into one holding. Keeping each pick small limits the damage if one goes wrong." },
+];
+const PATH_START = { allinone: "targetdate", whole: "index", intl: "intl", bonds: "bond", crypto: "crypto", dividend: "dividend", factor: "factor", sector: "sector", esg: "esg", reits: "reit", company: "valuation", active: "trading", options: "options" };
+
+const GBY = Object.fromEntries(GLOSSARY.map((e) => [e.id, e]));
+const PHRASES = GLOSSARY.flatMap((e) => e.match.map((m) => ({ m, e }))).sort((a, b) => b.m.length - a.m.length);
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const RX = new RegExp("\\b(" + PHRASES.map((p) => esc(p.m)).join("|") + ")(?![\\w-])", "gi");
+function linkify(text, used) {
+  return text.replace(RX, (hit) => {
+    const p = PHRASES.find((x) => x.m.toLowerCase() === hit.toLowerCase() && (!x.e.cs || x.m === hit));
+    if (!p || used.has(p.e.id)) return hit;
+    used.add(p.e.id);
+    return `<button type="button" class="term" data-g="${p.e.id}">${hit}</button>`;
+  });
+}
+const yt = (v) => `https://www.youtube.com/watch?v=${v[0]}`;
+const watchLink = (v, lead = "Watch") => `<a class="watch" href="${yt(v)}" target="_blank" rel="noopener">${lead}: ${v[1]} <small>${v[2]} · ${v[3]}</small></a>`;
+function termBody(e) {
+  return `<p style="margin:0">${e.def}</p>` +
+    (e.v ? watchLink(e.v) : "") + (e.more ? watchLink(e.more, "Go deeper") : "") +
+    (e.read ? `<a class="watch" href="${e.read[0]}" target="_blank" rel="noopener">Read: ${e.read[1]}</a>` : "");
+}
+const termcard = document.getElementById("termcard");
+function showTerm(id) {
+  if (id === "__glossary") { document.getElementById("glossary").scrollIntoView({ behavior: "smooth" }); return; }
+  const e = GBY[id]; if (!e) return;
+  termcard.hidden = false;
+  termcard.innerHTML = `<h2>${e.term}</h2>${termBody(e)}<button type="button" class="pickbtn on" id="closeterm">Close</button>`;
+  document.getElementById("closeterm").addEventListener("click", () => { termcard.hidden = true; });
+  termcard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+document.addEventListener("click", (ev) => { const b = ev.target.closest(".term"); if (b) showTerm(b.dataset.g); });
+function renderGlossary(q = "") {
+  const list = document.getElementById("glist"); q = q.trim().toLowerCase();
+  const items = [...GLOSSARY].sort((a, b) => a.term.localeCompare(b.term)).filter((e) => !q || (e.term + " " + e.def + " " + e.match.join(" ")).toLowerCase().includes(q));
+  list.innerHTML = items.map((e) => `<div class="gitem" id="g-${e.id}"><h3>${e.term}</h3>${termBody(e)}</div>`).join("") || `<p class="note">No word matches "${q.replace(/[<>&"]/g, "")}". Try a shorter search.</p>`;
+}
+document.getElementById("gsearch").addEventListener("input", (e) => renderGlossary(e.target.value));
+renderGlossary();
+function renderDetail() {
+  if (!current) {
+    detail.innerHTML = `<h2>Pick a path on the map</h2><p class="note">Its details, what it needs first, and what it pairs with, overlaps or conflicts with show here.</p>`;
+    return;
+  }
+  const P = PATHS[current];
+  const rels = relsOf(current);
+  const label = (r) => r.t === "builds" ? (r.dir === "out" ? "Needs first" : "Needed by") : TYPE_LABEL[r.t];
+  const used = new Set();
+  const what = linkify(P.what, used), fits = linkify(P.fits, used);
+  const items = rels.map((r) => `<li><span class="dot" style="background:${TYPE_COLOR[r.t]}"></span><span><b>${label(r)}: ${PATHS[r.other].name}.</b> ${linkify(r.why, used)}</span></li>`).join("") || `<li>Stands mostly on its own.</li>`;
+  const picked = myPicks.has(current);
+  detail.innerHTML = `
+    <h2>${P.name}</h2>
+    <div class="meta"><span class="chip">Risk ${scale(P.risk)}</span><span class="chip">Hands-on ${scale(P.hands)}</span><span class="chip">About ${P.hours} hours</span></div>
+    ${P.rule ? `<p class="flag">Outside the current course rules. Picking it means changing that rule first.</p>` : ""}
+    ${GBY[PATH_START[current]] && GBY[PATH_START[current]].v ? `<div class="start"><span>Start here</span>${watchLink(GBY[PATH_START[current]].v)}</div>` : ""}
+    <dl><div><dt>What it is</dt><dd>${what}</dd></div><div><dt>Fits</dt><dd>${fits}</dd></div></dl>
+    <div><dt style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Connections</dt><ul class="rel">${items}</ul></div>
+    <button type="button" class="pickbtn${picked ? " on" : ""}" id="pickbtn">${picked ? "Remove from my picks" : "Add to my picks"}</button>
+    <p class="note" id="picknote"></p>`;
+  document.getElementById("pickbtn").addEventListener("click", togglePick);
+}
+function checks(keys) {
+  const s = new Set(keys), out = [];
+  EDGES.forEach(([a, b, t, why]) => {
+    if (t === "conflict" && s.has(a) && s.has(b)) out.push(["c", `${PATHS[a].name} and ${PATHS[b].name}: ${why}`]);
+    if (t === "overlap" && s.has(a) && s.has(b)) out.push(["o", `${PATHS[a].name} and ${PATHS[b].name} overlap: ${why}`]);
+  });
+  keys.forEach((k) => {
+    const needs = EDGES.filter(([a, , t]) => a === k && t === "builds").map(([, b]) => b);
+    if (needs.length && !needs.some((n) => s.has(n))) out.push(["b", `${PATHS[k].name} needs ${needs.map((n) => PATHS[n].name).join(" or ")} first.`]);
+    if (PATHS[k].rule) out.push(["c", `${PATHS[k].name} is outside the current course rules.`]);
+  });
+  return out;
+}
+const hoursFor = (keys) => 39 + keys.reduce((n, k) => n + PATHS[k].hours, 0);
+const order = Object.keys(PATHS);
+let others = []; // [{name, picks}]
+const nameEl = document.getElementById("myname");
+try { nameEl.value = localStorage.getItem("markets-name") || ""; } catch (e) {}
+nameEl.addEventListener("input", () => { try { localStorage.setItem("markets-name", nameEl.value); } catch (e) {} renderPeople(); });
+function renderPeople() {
+  const box = document.getElementById("people");
+  const list = [{ name: (nameEl.value.trim() || "You") + " (this browser)", picks: [...myPicks] }, ...others];
+  box.innerHTML = "";
+  list.forEach((p) => {
+    const keys = order.filter((k) => p.picks.includes(k));
+    const d = document.createElement("div"); d.className = "person";
+    const h = document.createElement("h3"); h.textContent = keys.length ? `${p.name}: ${keys.length} path${keys.length === 1 ? "" : "s"}, about ${hoursFor(keys)} hours in all` : `${p.name}: no picks yet`; d.appendChild(h);
+    const ul = document.createElement("ul"); keys.forEach((k) => { const li = document.createElement("li"); li.textContent = PATHS[k].name; ul.appendChild(li); }); d.appendChild(ul);
+    const w = checks(keys); if (w.length) { const wl = document.createElement("ul"); wl.className = "warn"; w.forEach(([c, t]) => { const li = document.createElement("li"); li.className = c; li.textContent = t; wl.appendChild(li); }); d.appendChild(wl); }
+    box.appendChild(d);
+  });
+}
+function paintPicked() { for (const n in nodeEls) nodeEls[n].classList.toggle("picked", myPicks.has(n)); }
+function togglePick() {
+  if (!current) return;
+  myPicks.has(current) ? myPicks.delete(current) : myPicks.add(current);
+  paintPicked(); renderDetail(); renderPeople();
+  try { localStorage.setItem("markets-picks", JSON.stringify([...myPicks])); } catch (e) {}
+}
+const setStatus = (t) => { document.getElementById("status").textContent = t; };
+document.getElementById("savefile").addEventListener("click", () => {
+  const name = nameEl.value.trim();
+  if (!name) { setStatus("Add your name first, so the file says whose picks they are."); nameEl.focus(); return; }
+  const keys = order.filter((k) => myPicks.has(k));
+  const data = { name, picks: keys, pathNames: keys.map((k) => PATHS[k].name), hours: hoursFor(keys), saved: new Date().toISOString().slice(0, 10) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `Markets picks - ${name.replace(/[^\w .-]/g, "")}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  setStatus("Saved. Put the file in the Stocks and Investing folder in WorkDrive.");
+});
+document.getElementById("loadfile").addEventListener("change", async (e) => {
+  for (const f of e.target.files) {
+    try {
+      const d = JSON.parse(await f.text());
+      const picks = Array.isArray(d.picks) ? d.picks.filter((k) => PATHS[k]) : [];
+      const name = String(d.name || f.name).slice(0, 60);
+      others = others.filter((o) => o.name !== name).concat([{ name, picks }]);
+      setStatus(`Opened ${name}'s picks.`);
+    } catch (err) { setStatus(`${f.name} isn't a picks file saved from this map.`); }
+  }
+  e.target.value = ""; renderPeople();
+});
+canSave = true;
+try { const s = JSON.parse(localStorage.getItem("markets-picks") || "[]"); if (Array.isArray(s)) s.forEach((k) => PATHS[k] && myPicks.add(k)); } catch (e) {}
+paintPicked(); renderDetail(); renderPeople();
+// Links like Markets Path Map.html#intl open a path; #term-etf opens a word.
+function fromHash() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (PATHS[h]) select(h);
+  else if (h.startsWith("term-") && GBY[h.slice(5)]) showTerm(h.slice(5));
+}
+window.addEventListener("hashchange", fromHash);
+fromHash();
+</script>
+
+</body></html>
