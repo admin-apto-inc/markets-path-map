@@ -27,22 +27,23 @@ body { background: var(--bg); color: var(--ink); font-family: var(--body); font-
 h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
 h1 { font-size: 1.7rem; }
 h2 { font-size: 1.15rem; }
-.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 18px; }
+.wrap { max-width: 1440px; margin: 0 auto; display: grid; gap: 18px; }
 .lede { color: var(--muted); max-width: 70ch; margin: 6px 0 0; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px; }
 .legend button { font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); cursor: pointer; }
 .legend button[aria-pressed="false"] { opacity: .45; }
 .legend i { width: 22px; height: 0; border-top: 3px solid currentColor; display: inline-block; }
-.main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
-@media (max-width: 980px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .main { grid-template-columns: minmax(0, 1fr); } }
 .mapbox { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
-svg { display: block; width: 100%; min-width: 800px; height: auto; }
-.tier-label { font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+svg { display: block; width: 100%; min-width: 900px; height: auto; }
+.tier-label { font: 600 13px var(--body); letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
 .tier { fill: var(--tier); }
 .node rect { fill: var(--node); stroke: var(--line); stroke-width: 1.5; }
-.node text { fill: var(--node-ink); font: 600 14px var(--display); pointer-events: none; }
-.node .sub { font: 400 11.5px var(--body); fill: var(--muted); }
+.node text { fill: var(--node-ink); font: 600 18px var(--display); pointer-events: none; }
+.node .sub { font: 400 14px var(--body); fill: var(--muted); }
+.node .hrs { font: 600 13px var(--body); fill: var(--accent); }
 .node { cursor: pointer; }
 .node:focus { outline: none; }
 .node:focus rect, .node.sel rect { stroke: var(--accent); stroke-width: 3; }
@@ -114,7 +115,7 @@ dd { margin: 0; }
   </div>
 
   <div class="main">
-    <div class="mapbox"><svg id="map" viewBox="0 0 1060 640" role="img" aria-label="Map of investment paths and their connections"></svg></div>
+    <div class="mapbox"><svg id="map" viewBox="0 0 1150 600" role="img" aria-label="Map of investment paths and their connections"></svg></div>
     <div class="side">
       <section class="card" id="detail" aria-live="polite"></section>
       <section class="card" id="termcard" aria-live="polite" hidden></section>
@@ -144,43 +145,43 @@ dd { margin: 0; }
 
 <script>
 const PATHS = {
-  allinone: { name: "All-in-one or robo", sub: "One fund or service", tier: 1, x: 40,
+  allinone: { name: "All-in-one or robo", sub: "One fund or service", tier: 1, x: 14,
     what: "A single target-date or balanced fund, or a robo-adviser, that holds U.S. stocks, international stocks and bonds in a set mix and rebalances for you.",
     fits: "Someone who wants the least hands-on approach possible.", risk: 2, hands: 1, hours: 6 },
-  whole: { name: "Whole market", sub: "Broad index funds", tier: 1, x: 240,
+  whole: { name: "Whole market", sub: "Broad index funds", tier: 1, x: 236,
     what: "Index funds that own nearly every U.S. company, bought and held. Often built as a three-fund setup with international and bonds.",
     fits: "Hands-off investors who still want to choose their own mix.", risk: 3, hands: 2, hours: 10 },
-  intl: { name: "International", sub: "Outside the U.S.", tier: 1, x: 440,
+  intl: { name: "International", sub: "Outside the U.S.", tier: 1, x: 458,
     what: "Developed and emerging markets through international funds, ADRs, or shares bought on foreign exchanges. Adds currency and country risk, and foreign tax on dividends.",
     fits: "Someone who wants more than the U.S. market, or more than a broad fund's default international share.", risk: 3, hands: 3, hours: 15 },
-  bonds: { name: "Bonds and income", sub: "Treasuries, funds", tier: 1, x: 640,
+  bonds: { name: "Bonds and income", sub: "Treasuries, funds", tier: 1, x: 680,
     what: "Lending instead of owning: Treasuries, TIPS, I bonds and bond funds. Lower swings, lower long-run growth, and interest-rate risk.",
     fits: "Lower risk capacity, money needed within a few years, or anyone steadying a stock-heavy mix.", risk: 1, hands: 2, hours: 10 },
-  crypto: { name: "Crypto", sub: "Not a stock", tier: 1, x: 860, outside: true,
+  crypto: { name: "Crypto", sub: "Not a stock", tier: 1, x: 926, outside: true,
     what: "Bitcoin and other digital assets, held directly on an exchange or through crypto ETFs in a brokerage account. Very volatile, and a frequent target of fraud.",
     fits: "Someone with high risk capacity who treats it as a small, separate slice.", risk: 5, hands: 3, hours: 10 },
-  dividend: { name: "Dividend investing", sub: "Steady payouts", tier: 2, x: 40,
+  dividend: { name: "Dividend investing", sub: "Steady payouts", tier: 2, x: 14,
     what: "Companies or funds chosen for steady, growing dividends. Dividends in a taxable account are taxed each year, even if reinvested.",
     fits: "Someone who wants income from the portfolio, or prefers mature companies.", risk: 3, hands: 3, hours: 8 },
-  factor: { name: "Factor tilts", sub: "Value, small firms", tier: 2, x: 240,
+  factor: { name: "Factor tilts", sub: "Value, small firms", tier: 2, x: 236,
     what: "Leaning a whole-market portfolio toward company traits that research links to higher long-run returns, such as cheap (value) or small companies. Can trail the market for years.",
     fits: "A whole-market investor who has read the research and can stick with a tilt through long dry spells.", risk: 3, hands: 2, hours: 8 },
-  sector: { name: "Sector or theme", sub: "One industry or trend", tier: 2, x: 440,
+  sector: { name: "Sector or theme", sub: "One industry or trend", tier: 2, x: 458,
     what: "Funds for one industry (healthcare, energy, tech) or a trend. Concentrated, so swings are bigger, and popular themes are often bought after the run-up.",
     fits: "Someone with a strong view on one area, kept to a small slice.", risk: 4, hands: 3, hours: 6 },
-  esg: { name: "Values-based (ESG)", sub: "Screened holdings", tier: 2, x: 640,
+  esg: { name: "Values-based (ESG)", sub: "Screened holdings", tier: 2, x: 680,
     what: "Funds that screen companies on environmental, social or governance criteria. Screens differ widely between funds, and fees are often higher.",
     fits: "Someone for whom what the money owns matters as much as the return.", risk: 3, hands: 2, hours: 6 },
-  reits: { name: "Real estate (REITs)", sub: "Property as stock", tier: 2, x: 840,
+  reits: { name: "Real estate (REITs)", sub: "Property as stock", tier: 2, x: 902,
     what: "Companies that own property and pay out most of their income. Their dividends are mostly taxed as ordinary income.",
     fits: "Someone who wants property exposure without buying property.", risk: 3, hands: 2, hours: 6 },
-  company: { name: "Company picking", sub: "Individual stocks", tier: 3, x: 190,
+  company: { name: "Company picking", sub: "Individual stocks", tier: 3, x: 180,
     what: "Researching and choosing individual companies: annual reports, valuation, position size, when to sell.",
     fits: "Hands-on investors with time for research and a higher risk level.", risk: 4, hands: 5, hours: 18 },
-  active: { name: "Active trading", sub: "Swing or day trading", tier: 3, x: 450,
+  active: { name: "Active trading", sub: "Swing or day trading", tier: 3, x: 470,
     what: "Frequent buying and selling to profit from short-term moves. Gains held a year or less are taxed as ordinary income, and wash-sale rules apply to losses.",
     fits: "Very hands-on, high risk capacity, and time during market hours.", risk: 5, hands: 5, hours: 15 },
-  options: { name: "Options and margin", sub: "Also short selling", tier: 3, x: 710, rule: true,
+  options: { name: "Options and margin", sub: "Also short selling", tier: 3, x: 760, rule: true,
     what: "Borrowing to invest (margin), betting on a fall (short selling) or trading contracts on a stock's price (options). Losses can exceed what you put in. Margin isn't allowed in IRAs, and options there are limited.",
     fits: "Experienced investors only. The current course rules exclude these, so choosing this path means changing a rule.", risk: 5, hands: 5, hours: 20 },
 };
@@ -210,12 +211,12 @@ const EDGES = [
   ["esg","sector","conflict","Some sectors (energy, for one) are screened out by many ESG funds."],
 ];
 const TIERS = [
-  { y: 32, h: 150, label: "Building blocks: what the portfolio is made of" },
-  { y: 212, h: 150, label: "Tilts: added on top of a building block" },
-  { y: 392, h: 150, label: "Hands-on: you choose, time and size each holding" },
+  { y: 24, h: 150, label: "Building blocks: what the portfolio is made of" },
+  { y: 196, h: 150, label: "Tilts: added on top of a building block" },
+  { y: 368, h: 150, label: "Hands-on: you choose, time and size each holding" },
 ];
-const W = 176, H = 64;
-const nodeY = (t) => TIERS[t - 1].y + 62;
+const W = 210, H = 86;
+const nodeY = (t) => TIERS[t - 1].y + 48;
 const C = (k) => ({ x: PATHS[k].x + W / 2, y: nodeY(PATHS[k].tier) + H / 2 });
 const svg = document.getElementById("map");
 const NS = "http://www.w3.org/2000/svg";
@@ -225,11 +226,11 @@ const TYPE_COLOR = { builds: "var(--builds)", pairs: "var(--pairs)", overlap: "v
 const scale = (n) => "●".repeat(n) + "○".repeat(5 - n);
 
 // tiers
-TIERS.forEach((t) => { el("rect", { class: "tier", x: 12, y: t.y, width: 1036, height: t.h, rx: 10 }); const tx = el("text", { class: "tier-label", x: 28, y: t.y + 24 }); tx.textContent = t.label; });
-el("line", { x1: 840, y1: 70, x2: 840, y2: 176, stroke: "var(--outside)", "stroke-dasharray": "4 4", "stroke-width": 1.5 });
-const out = el("text", { class: "tier-label", x: 860, y: 86 }); out.textContent = "Not stocks";
-const foot = el("text", { class: "tier-label", x: 28, y: 580 }); foot.textContent = "Every path builds on the core modules. Dashed outline: outside the current course rules.";
-const foot2 = el("text", { class: "tier-label", x: 28, y: 602 }); foot2.textContent = "Hours are rough estimates for that path's modules, on top of about 39 hours of core and finish.";
+TIERS.forEach((t) => { el("rect", { class: "tier", x: 6, y: t.y, width: 1138, height: t.h, rx: 10 }); const tx = el("text", { class: "tier-label", x: 22, y: t.y + 26 }); tx.textContent = t.label; });
+el("line", { x1: 907, y1: 66, x2: 907, y2: 176, stroke: "var(--outside)", "stroke-dasharray": "4 4", "stroke-width": 1.5 });
+const out = el("text", { class: "tier-label", x: 924, y: 66 }); out.textContent = "Not stocks";
+const foot = el("text", { class: "tier-label", x: 22, y: 552 }); foot.textContent = "Every path builds on the core modules. Dashed outline: outside the current course rules.";
+const foot2 = el("text", { class: "tier-label", x: 22, y: 578 }); foot2.textContent = "Hours are rough estimates for that path's modules, on top of about 39 hours of core and finish.";
 
 // edges
 const edgeEls = EDGES.map(([a, b, t]) => {
@@ -245,8 +246,9 @@ for (const k in PATHS) {
   el("title", {}, g).textContent = P.name + ": " + P.what;
   el("rect", { x: P.x, y, width: W, height: H, rx: 8 }, g);
   if (P.outside) g.querySelector("rect").style.stroke = "var(--outside)";
-  const t1 = el("text", { x: P.x + 12, y: y + 26 }, g); t1.textContent = P.name;
-  const t2 = el("text", { class: "sub", x: P.x + 12, y: y + 46 }, g); t2.textContent = `${P.sub} · ~${P.hours} h`;
+  const t1 = el("text", { x: P.x + 14, y: y + 30 }, g); t1.textContent = P.name;
+  const t2 = el("text", { class: "sub", x: P.x + 14, y: y + 54 }, g); t2.textContent = P.sub;
+  const t3 = el("text", { class: "hrs", x: P.x + 14, y: y + 74 }, g); t3.textContent = `About ${P.hours} hours`;
   g.addEventListener("click", () => select(k));
   g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(k); } });
   nodeEls[k] = g;
