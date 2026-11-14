@@ -216,7 +216,7 @@ const TIERS = [
   { y: 456, h: 196, label: "Hands-on: you choose, time and size each holding" },
 ];
 const W = 210, H = 86;
-const nodeY = (t) => TIERS[t - 1].y + 92;
+const nodeY = (t) => TIERS[t - 1].y + 100;
 const C = (k) => ({ x: PATHS[k].x + W / 2, y: nodeY(PATHS[k].tier) + H / 2 });
 const svg = document.getElementById("map");
 const NS = "http://www.w3.org/2000/svg";
@@ -226,9 +226,10 @@ const TYPE_COLOR = { builds: "var(--builds)", pairs: "var(--pairs)", overlap: "v
 const scale = (n) => "●".repeat(n) + "○".repeat(5 - n);
 
 // tiers
-TIERS.forEach((t) => { el("rect", { class: "tier", x: 6, y: t.y, width: 1138, height: t.h, rx: 10 }); const tx = el("text", { class: "tier-label", x: 22, y: t.y + 26 }); tx.textContent = t.label; });
+const tierLabels = [];
+TIERS.forEach((t) => { el("rect", { class: "tier", x: 6, y: t.y, width: 1138, height: t.h, rx: 10 }); tierLabels.push(t); });
 el("line", { x1: 907, y1: 60, x2: 907, y2: 208, stroke: "var(--outside)", "stroke-dasharray": "4 4", "stroke-width": 1.5 });
-const out = el("text", { class: "tier-label", x: 924, y: 100 }); out.textContent = "Not stocks";
+const out = el("text", { class: "tier-label", x: 924, y: 110 }); out.textContent = "Not stocks";
 const foot = el("text", { class: "tier-label", x: 22, y: 682 }); foot.textContent = "Every path builds on the core modules. Dashed outline: outside the current course rules.";
 const foot2 = el("text", { class: "tier-label", x: 22, y: 708 }); foot2.textContent = "Hours are rough estimates for that path's modules, on top of about 39 hours of core and finish.";
 
@@ -251,6 +252,13 @@ const edgeEls = EDGES.map(([a, b, t]) => {
     d = `M${u.x + lean(l.x - u.x)},${u.y + H / 2} L${l.x + lean(u.x - l.x)},${l.y - H / 2}`;
   }
   return el("path", { class: "edge " + t, d, "data-a": a, "data-b": b });
+});
+// Row titles sit on a small patch drawn over the lines, so nothing crosses the words.
+tierLabels.forEach((t) => {
+  const bg = el("rect", { class: "tier", x: 14, y: t.y + 8, width: 600, height: 24, rx: 6 });
+  const tx = el("text", { class: "tier-label", x: 22, y: t.y + 24 }); tx.textContent = t.label;
+  const fit = () => { try { bg.setAttribute("width", tx.getComputedTextLength() * 1.04 + 18); } catch (e) {} };
+  fit(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 });
 // nodes
 const nodeEls = {};
