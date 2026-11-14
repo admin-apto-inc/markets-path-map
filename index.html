@@ -50,12 +50,12 @@ svg { display: block; width: 100%; min-width: 900px; height: auto; }
 .node.picked rect { fill: var(--picked); }
 .node.rule rect { stroke-dasharray: 5 4; }
 .node.dim { opacity: .28; }
-.edge { fill: none; stroke-width: 2.4; }
+.edge { fill: none; stroke-width: 3.2; stroke-linecap: round; }
 .edge.pairs { stroke: var(--pairs); }
 .edge.builds { stroke: var(--builds); }
 .edge.overlap { stroke: var(--overlap); stroke-dasharray: 2 5; stroke-linecap: round; }
 .edge.conflict { stroke: var(--conflict); stroke-dasharray: 9 6; }
-.edge.dim { opacity: .1; }
+.edge.dim { opacity: .12; }
 .edge.hide { display: none; }
 .side { display: grid; gap: 14px; min-width: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
@@ -115,7 +115,7 @@ dd { margin: 0; }
   </div>
 
   <div class="main">
-    <div class="mapbox"><svg id="map" viewBox="0 0 1150 600" role="img" aria-label="Map of investment paths and their connections"></svg></div>
+    <div class="mapbox"><svg id="map" viewBox="0 0 1150 724" role="img" aria-label="Map of investment paths and their connections"></svg></div>
     <div class="side">
       <section class="card" id="detail" aria-live="polite"></section>
       <section class="card" id="termcard" aria-live="polite" hidden></section>
@@ -211,12 +211,12 @@ const EDGES = [
   ["esg","sector","conflict","Some sectors (energy, for one) are screened out by many ESG funds."],
 ];
 const TIERS = [
-  { y: 24, h: 150, label: "Building blocks: what the portfolio is made of" },
-  { y: 196, h: 150, label: "Tilts: added on top of a building block" },
-  { y: 368, h: 150, label: "Hands-on: you choose, time and size each holding" },
+  { y: 20, h: 196, label: "Building blocks: what the portfolio is made of" },
+  { y: 238, h: 196, label: "Tilts: added on top of a building block" },
+  { y: 456, h: 196, label: "Hands-on: you choose, time and size each holding" },
 ];
 const W = 210, H = 86;
-const nodeY = (t) => TIERS[t - 1].y + 48;
+const nodeY = (t) => TIERS[t - 1].y + 92;
 const C = (k) => ({ x: PATHS[k].x + W / 2, y: nodeY(PATHS[k].tier) + H / 2 });
 const svg = document.getElementById("map");
 const NS = "http://www.w3.org/2000/svg";
@@ -227,16 +227,30 @@ const scale = (n) => "●".repeat(n) + "○".repeat(5 - n);
 
 // tiers
 TIERS.forEach((t) => { el("rect", { class: "tier", x: 6, y: t.y, width: 1138, height: t.h, rx: 10 }); const tx = el("text", { class: "tier-label", x: 22, y: t.y + 26 }); tx.textContent = t.label; });
-el("line", { x1: 907, y1: 66, x2: 907, y2: 176, stroke: "var(--outside)", "stroke-dasharray": "4 4", "stroke-width": 1.5 });
-const out = el("text", { class: "tier-label", x: 924, y: 66 }); out.textContent = "Not stocks";
-const foot = el("text", { class: "tier-label", x: 22, y: 552 }); foot.textContent = "Every path builds on the core modules. Dashed outline: outside the current course rules.";
-const foot2 = el("text", { class: "tier-label", x: 22, y: 578 }); foot2.textContent = "Hours are rough estimates for that path's modules, on top of about 39 hours of core and finish.";
+el("line", { x1: 907, y1: 60, x2: 907, y2: 208, stroke: "var(--outside)", "stroke-dasharray": "4 4", "stroke-width": 1.5 });
+const out = el("text", { class: "tier-label", x: 924, y: 100 }); out.textContent = "Not stocks";
+const foot = el("text", { class: "tier-label", x: 22, y: 682 }); foot.textContent = "Every path builds on the core modules. Dashed outline: outside the current course rules.";
+const foot2 = el("text", { class: "tier-label", x: 22, y: 708 }); foot2.textContent = "Hours are rough estimates for that path's modules, on top of about 39 hours of core and finish.";
 
 // edges
 const edgeEls = EDGES.map(([a, b, t]) => {
   const p = C(a), q = C(b);
-  const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2 - (p.y === q.y ? 46 : 0);
-  return el("path", { class: "edge " + t, d: `M${p.x},${p.y} Q${mx},${my} ${q.x},${q.y}`, "data-a": a, "data-b": b });
+  let d;
+  if (PATHS[a].tier === PATHS[b].tier) {
+    // Same row: an arc over the top of the boxes, taller for boxes further apart.
+    const steps = Math.round(Math.abs(q.x - p.x) / 222), dir = Math.sign(q.x - p.x);
+    const inset = steps === 1 ? 62 : steps === 2 ? 30 : 0;
+    const top = nodeY(PATHS[a].tier), h = 12 + 22 * steps;
+    const x1 = p.x + dir * inset, x2 = q.x - dir * inset;
+    d = `M${x1},${top} C${x1},${top - h} ${x2},${top - h} ${x2},${top}`;
+  } else {
+    // Different rows: from the bottom of the upper box to the top of the lower one.
+    const [u, l] = PATHS[a].tier < PATHS[b].tier ? [p, q] : [q, p];
+    // Spread the ends along each box edge, toward the other box, so lines don't bunch at one point.
+    const lean = (dx) => Math.max(-W / 2 + 18, Math.min(W / 2 - 18, dx * 0.3));
+    d = `M${u.x + lean(l.x - u.x)},${u.y + H / 2} L${l.x + lean(u.x - l.x)},${l.y - H / 2}`;
+  }
+  return el("path", { class: "edge " + t, d, "data-a": a, "data-b": b });
 });
 // nodes
 const nodeEls = {};
